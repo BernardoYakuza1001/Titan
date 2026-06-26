@@ -1,0 +1,26 @@
+{
+  // Type-checking config for the test suite.
+  //
+  // The base tsconfig (used by `tsc -b`) only includes ["libs", "services"], so
+  // the test/ directory was never type-checked by either `npm run build` or
+  // `npm test` (ts-jest runs with isolatedModules: true, i.e. transpile-only).
+  // This config adds test/ so a genuine type error in a *.spec.ts is caught.
+  //
+  // It is checked with `tsc -p tsconfig.spec.json --noEmit` (see the test script)
+  // and is intentionally NOT part of the `tsc -b` project graph: it is noEmit and
+  // non-composite (a composite project may not set noEmit), so the build output
+  // is unchanged.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "noEmit": true,
+    // The `paths` mapping resolves @titan/profile-schema to the package SOURCE
+    // (../../packages/profile-schema/src), which lives outside apps/backend. With
+    // noEmit there is no output to constrain, so widen rootDir to the monorepo
+    // root to allow type-checking against that shared source without TS6059.
+    "rootDir": "../..",
+    "types": ["jest", "node"]
+  },
+  "include": ["test", "libs", "services"]
+}

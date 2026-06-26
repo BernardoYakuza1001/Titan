@@ -1,0 +1,47 @@
+name: Build Titan POS APK
+
+# Builds the installable debug APK in the cloud (where the Android SDK lives) and
+# uploads it as a downloadable artifact. Trigger manually (Actions tab → Run
+# workflow) or on any change under apps/android/.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'apps/android/**'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle :pos-app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: titan-pos-debug-apk
+          path: apps/android/pos-app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

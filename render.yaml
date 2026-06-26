@@ -1,0 +1,52 @@
+# PROJECT TITAN — Render.com Blueprint.
+# Deploys the backend (public HTTPS) + a managed Postgres. The phone app then
+# points at https://<your-service>.onrender.com — no PC, no LAN IP, no firewall.
+#
+# Steps: push this repo to GitHub → Render → New → Blueprint → select the repo →
+# fill the 5 secret env vars (below) → Apply. Render gives you an https URL.
+databases:
+  - name: titan-db
+    plan: free
+    databaseName: titan
+    user: titan
+
+services:
+  - type: web
+    name: titan-acquiring
+    runtime: node
+    plan: free
+    region: frankfurt
+    # Build replicates the verified local build; start migrates (idempotent) then serves.
+    buildCommand: npm install && npm run build
+    startCommand: node apps/backend/scripts/migrate.mjs && node apps/backend/dist/services/bootstrap/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: titan-db
+          property: connectionString
+      - key: VIVA_AUTH_SCHEME
+        value: basic
+      - key: VIVA_BASE_URL
+        value: https://api.vivapayments.com
+      - key: VIVA_ACCOUNTS_URL
+        value: https://accounts.vivapayments.com/connect/token
+      - key: VIVA_ORDERS_URL
+        value: https://www.vivapayments.com/api/orders
+      - key: VIVA_CHECKOUT_URL
+        value: https://www.vivapayments.com/web/checkout
+      - key: VIVA_SOURCE_CODE
+        value: "1937"
+      # ---- secrets: set these in the Render dashboard (sync:false = never in the repo) ----
+      # Set DEVICE_JWT_SECRET to the value in apps/backend/.env so the app's
+      # pre-filled device token keeps working (or set a new one + re-mint a token).
+      - key: DEVICE_JWT_SECRET
+        sync: false
+      - key: VIVA_MERCHANT_ID
+        sync: false
+      - key: VIVA_API_KEY
+        sync: false
+      - key: VIVA_CLIENT_ID
+        sync: false
+      - key: VIVA_CLIENT_SECRET
+        sync: false

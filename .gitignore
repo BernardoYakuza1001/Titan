@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# TypeScript build output
+dist/
+*.tsbuildinfo
+
+# Build artifacts
+*.apk
+local.properties
+
+# Test / coverage
+coverage/
+
+# Logs & env
+*.log
+.env
+.env.*
+# keep the (secret-free) template tracked:
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

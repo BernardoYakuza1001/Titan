@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/profile-schema" },
+    { "path": "./apps/backend" }
+  ]
+}

@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Titan POS</string>
+    <string name="tagline">Card payment terminal</string>
+    <string name="device_id_fmt">Device  •  %1$s %2$s</string>
+    <string name="admin_pin_hint">Admin PIN</string>
+    <string name="login">Login</string>
+    <string name="wrong_pin">Incorrect PIN</string>
+    <string name="profile_title">Select terminal profile</string>
+    <string name="scenario_title">Demo scenario (default = approved):</string>
+    <string name="scenario_decline">Simulate issuer decline</string>
+    <string name="scenario_timeout">Simulate gateway timeout</string>
+    <string name="run_demo">Run transaction (simulated)</string>
+    <string name="viva_pay">Pay by card (Viva Smart Checkout)</string>
+    <string name="exit">Exit</string>
+</resources>

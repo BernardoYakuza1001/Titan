@@ -1,0 +1,8 @@
+<resources>
+    <color name="titan_primary">#0E7C66</color>
+    <color name="titan_dark">#0B1F1A</color>
+    <color name="titan_bg">#0E2A23</color>
+    <color name="titan_on">#E6F4EF</color>
+    <color name="titan_muted">#7FA89B</color>
+    <color name="ic_launcher_background">#0B1F1A</color>
+</resources>

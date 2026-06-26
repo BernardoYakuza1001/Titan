@@ -1,0 +1,14 @@
+/** PROJECT TITAN — Viva acquiring DI tokens (NestJS providers are wired by these). */
+export const VIVA_CONFIG = Symbol('VIVA_CONFIG');
+export const VIVA_HTTP = Symbol('VIVA_HTTP');
+export const VIVA_TOKEN_PROVIDER = Symbol('VIVA_TOKEN_PROVIDER');
+export const ACQUIRING_GATEWAY = Symbol('ACQUIRING_GATEWAY');
+export const VIVA_DB = Symbol('VIVA_DB');
+export const LEDGER_REPOSITORY = Symbol('LEDGER_REPOSITORY');
+export const PROCESS_MOTO_PAYMENT = Symbol('PROCESS_MOTO_PAYMENT');
+export const QUERY_TERMINAL_HISTORY = Symbol('QUERY_TERMINAL_HISTORY');
+export const DEVICE_VERIFIER = Symbol('DEVICE_VERIFIER');
+export const TOKENIZATION_GATEWAY = Symbol('TOKENIZATION_GATEWAY');
+export const TOKENIZE_USECASE = Symbol('TOKENIZE_USECASE');
+export const CHECKOUT_ORDER_GATEWAY = Symbol('CHECKOUT_ORDER_GATEWAY');
+export const CREATE_CHECKOUT_ORDER = Symbol('CREATE_CHECKOUT_ORDER');
