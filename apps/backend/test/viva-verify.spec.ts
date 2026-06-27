@@ -59,4 +59,28 @@ describe('VivaTransactionVerifier.getTransaction', () => {
     expect(await new VivaTransactionVerifier(getClient({ status: 404, body: {} }).h, auth, cfg).getTransaction('X')).toBeNull();
     expect(await new VivaTransactionVerifier(getClient({}, { throws: true }).h, auth, cfg).getTransaction('X')).toBeNull();
   });
+
+  it('returns null when the transaction is not found (200 with empty Transactions[])', async () => {
+    const { h } = getClient({ status: 200, body: { Transactions: [], ErrorCode: 404, Success: false } });
+    expect(await new VivaTransactionVerifier(h, auth, cfg).getTransaction('X')).toBeNull();
+  });
+});
+
+describe('VivaTransactionVerifier.listTransactionsByOrder (pull path)', () => {
+  it('queries by order code and maps each transaction', async () => {
+    const { h, calls } = getClient({
+      status: 200,
+      body: { Transactions: [{ TransactionId: 'T1', StatusId: 'F', OrderCode: 12345, Amount: 1.0, CurrencyCode: '978' }], Success: true },
+    });
+    const list = await new VivaTransactionVerifier(h, auth, cfg).listTransactionsByOrder('12345');
+    expect(calls[0].u).toBe('https://www.vivapayments.com/api/transactions?ordercode=12345');
+    expect(list).toHaveLength(1);
+    expect(list[0]).toEqual({ transactionId: 'T1', orderCode: '12345', statusId: 'F', amountMajor: 1.0, currencyCode: '978' });
+  });
+
+  it('returns [] for an order with no transactions yet, and on error', async () => {
+    expect(await new VivaTransactionVerifier(getClient({ status: 200, body: { Transactions: [], Success: true } }).h, auth, cfg).listTransactionsByOrder('1')).toEqual([]);
+    expect(await new VivaTransactionVerifier(getClient({ status: 500, body: {} }).h, auth, cfg).listTransactionsByOrder('1')).toEqual([]);
+    expect(await new VivaTransactionVerifier(getClient({}, { throws: true }).h, auth, cfg).listTransactionsByOrder('1')).toEqual([]);
+  });
 });

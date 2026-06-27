@@ -15,7 +15,7 @@
  */
 import { OrderRepository } from './checkout-order.store';
 import { VivaTransactionVerifier } from './viva-verify';
-import { minorExponent, numericCode } from './currency';
+import { transactionConfirmsOrder } from './payment-match';
 
 export type ConfirmResult =
   | 'PAID'                     // verified and marked paid (or already paid)
@@ -34,9 +34,6 @@ export interface WebhookEvent {
 /** Viva EventTypeId values. */
 const EVENT_PAYMENT_CREATED = 1796; // Transaction Payment Created (success)
 const FAIL_EVENTS = new Set<number>([1798]); // Transaction Failed (NOT trusted — see header)
-
-/** Viva transaction StatusId that means captured/success. */
-const SUCCESS_STATUS = 'F';
 
 export class ConfirmCheckoutPaymentService {
   constructor(
@@ -59,27 +56,11 @@ export class ConfirmCheckoutPaymentService {
     if (!ev.transactionId) return 'REJECTED_VERIFICATION';
 
     // INDEPENDENT verification — never trust the webhook payload. Re-fetch the
-    // transaction from Viva under our own credentials and match every economic fact.
+    // transaction from Viva under our own credentials and match every economic fact
+    // (same matcher the pull path uses, so the two can never diverge).
     const txn = await this.verifier.getTransaction(ev.transactionId);
     if (!txn) return 'REJECTED_VERIFICATION';
-
-    const succeeded = txn.statusId === SUCCESS_STATUS;
-    const orderMatches = txn.orderCode != null && String(txn.orderCode) === String(order.orderCode);
-
-    // Scale Viva's MAJOR amount to minor units using OUR order's currency exponent
-    // (not a hardcoded *100, which breaks 0/3-decimal currencies).
-    const amountMatches =
-      txn.amountMajor != null &&
-      Math.round(txn.amountMajor * Math.pow(10, minorExponent(order.currency))) === order.amountMinor;
-
-    // If Viva reports a currency code, it MUST equal our order's currency. When the
-    // currency is unknown to us (no numeric mapping) we skip equality but still rely
-    // on the order-code + amount binding.
-    const expectedNumeric = numericCode(order.currency);
-    const currencyOk =
-      expectedNumeric == null || txn.currencyCode == null || String(txn.currencyCode) === expectedNumeric;
-
-    if (!succeeded || !orderMatches || !amountMatches || !currencyOk) return 'REJECTED_VERIFICATION';
+    if (!transactionConfirmsOrder(txn, order)) return 'REJECTED_VERIFICATION';
 
     await this.orders.markPaid(order.orderCode, txn.transactionId);
     return 'PAID';

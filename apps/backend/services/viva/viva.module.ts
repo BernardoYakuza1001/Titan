@@ -178,8 +178,9 @@ import { HealthController } from './health.controller';
 
     {
       provide: GET_ORDER_STATUS,
-      useFactory: (orders: OrderRepository) => new GetOrderStatusService(orders),
-      inject: [ORDER_REPOSITORY],
+      useFactory: (orders: OrderRepository, verifier: VivaTransactionVerifier) =>
+        new GetOrderStatusService(orders, verifier),
+      inject: [ORDER_REPOSITORY, VIVA_TX_VERIFIER],
     },
   ],
 })

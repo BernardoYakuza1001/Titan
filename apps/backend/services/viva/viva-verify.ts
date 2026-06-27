@@ -87,17 +87,47 @@ export class VivaTransactionVerifier {
       t = body;
     }
 
-    const statusId = String(t.StatusId ?? t.statusId ?? '');
-    const orderCode = t.OrderCode ?? t.orderCode;
-    const amount = t.Amount ?? t.amount;
-    const currencyCode = t.CurrencyCode ?? t.currencyCode;
-
-    return {
-      transactionId,
-      orderCode: orderCode == null ? null : String(orderCode),
-      statusId,
-      amountMajor: amount == null || amount === '' ? null : Number(amount),
-      currencyCode: currencyCode == null ? null : String(currencyCode),
-    };
+    return mapTransaction(t, transactionId);
   }
+
+  /**
+   * PULL path: list a Viva order's transactions by order code. Lets the backend
+   * confirm a payment WITHOUT waiting for the webhook (and survive a missed one).
+   * Returns [] on any non-success / network error.
+   */
+  async listTransactionsByOrder(orderCode: string): Promise<VivaTransactionDetails[]> {
+    let authorization: string;
+    try {
+      authorization = await this.auth.authHeader();
+    } catch {
+      return [];
+    }
+    let res: VivaHttpResponse;
+    try {
+      res = await this.http.get(
+        `${this.cfg.wwwBaseUrl}/api/transactions?ordercode=${encodeURIComponent(orderCode)}`,
+        { Authorization: authorization, 'Content-Type': 'application/json' },
+      );
+    } catch {
+      return [];
+    }
+    if (res.status < 200 || res.status >= 300) return [];
+    const arr = res.body?.Transactions ?? res.body?.transactions;
+    if (!Array.isArray(arr)) return [];
+    return arr.map((t: any) => mapTransaction(t, String(t.TransactionId ?? t.transactionId ?? '')));
+  }
+}
+
+/** Map one Viva transaction object (PascalCase or camelCase) to our shape. */
+function mapTransaction(t: any, transactionId: string): VivaTransactionDetails {
+  const orderCode = t.OrderCode ?? t.orderCode;
+  const amount = t.Amount ?? t.amount;
+  const currencyCode = t.CurrencyCode ?? t.currencyCode;
+  return {
+    transactionId,
+    orderCode: orderCode == null ? null : String(orderCode),
+    statusId: String(t.StatusId ?? t.statusId ?? ''),
+    amountMajor: amount == null || amount === '' ? null : Number(amount),
+    currencyCode: currencyCode == null ? null : String(currencyCode),
+  };
 }
