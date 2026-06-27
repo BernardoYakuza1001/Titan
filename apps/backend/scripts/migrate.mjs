@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 
 const url = process.env.DATABASE_URL;
 if (!url) { console.error('DATABASE_URL not set (use --env-file=.env).'); process.exit(2); }
+console.log('DB host =>', new URL(url).hostname);
 
 // Resolve migrations relative to THIS script, so it works from any cwd (e.g. a
 // cloud start command run from the repo root).
@@ -36,3 +37,4 @@ try {
 } finally {
   await pool.end();
 }
+
