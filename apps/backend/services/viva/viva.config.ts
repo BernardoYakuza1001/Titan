@@ -15,6 +15,12 @@ export interface VivaEnvConfig {
   ordersUrl: string;
   checkoutUrl: string;
   databaseUrl: string;
+  /** www base for the read-side confirmation API (transactions + webhook token). */
+  wwwBaseUrl: string;
+  /** optional shared secret required as ?whk= on the webhook POST (gate; '' = off). */
+  webhookSecret: string;
+  /** optional override for the Viva webhook verification token (else fetched live). */
+  webhookToken: string;
 }
 
 export function vivaConfigFromEnv(env: NodeJS.ProcessEnv = process.env): VivaEnvConfig {
@@ -38,5 +44,8 @@ export function vivaConfigFromEnv(env: NodeJS.ProcessEnv = process.env): VivaEnv
     ordersUrl: env.VIVA_ORDERS_URL ?? 'https://www.vivapayments.com/api/orders',
     checkoutUrl: env.VIVA_CHECKOUT_URL ?? 'https://www.vivapayments.com/web/checkout',
     databaseUrl: env.DATABASE_URL ?? '',
+    wwwBaseUrl: env.VIVA_WWW_BASE_URL ?? 'https://www.vivapayments.com',
+    webhookSecret: env.VIVA_WEBHOOK_SECRET ?? '',
+    webhookToken: env.VIVA_WEBHOOK_TOKEN ?? '',
   };
 }

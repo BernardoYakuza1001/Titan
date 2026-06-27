@@ -35,6 +35,8 @@ services:
         value: https://www.vivapayments.com/api/orders
       - key: VIVA_CHECKOUT_URL
         value: https://www.vivapayments.com/web/checkout
+      - key: VIVA_WWW_BASE_URL
+        value: https://www.vivapayments.com
       - key: VIVA_SOURCE_CODE
         value: "1937"
       # ---- secrets: set these in the Render dashboard (sync:false = never in the repo) ----
@@ -49,4 +51,9 @@ services:
       - key: VIVA_CLIENT_ID
         sync: false
       - key: VIVA_CLIENT_SECRET
+        sync: false
+      # Optional: a shared secret you append to the webhook URL as ?whk=<value>.
+      # When set, the webhook POST must carry it (cheap first gate). Leave blank to
+      # disable — every "paid" event is independently verified against Viva either way.
+      - key: VIVA_WEBHOOK_SECRET
         sync: false

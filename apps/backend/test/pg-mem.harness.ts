@@ -124,9 +124,13 @@ function registerPgStubs(mem: IMemoryDb): void {
 
 /** Apply every migration file (in order) against the given Db. Returns count. */
 export async function applyMigrations(db: Db): Promise<number> {
-  // 010_viva_fiat_acquiring.sql uses plpgsql triggers + regex CHECKs that pg-mem
-  // cannot run. That bounded context (fiat acquiring) is verified against real
-  // Postgres and via its own pg-mem-shaped table in viva-ledger.pg.spec.ts, so it
-  // is excluded from this crypto-side harness.
-  return migrate(db, { dir: MIGRATIONS_DIR, excludeFiles: ['010_viva_fiat_acquiring.sql'] });
+  // 010_viva_fiat_acquiring.sql and 011_viva_checkout_orders.sql use plpgsql
+  // triggers + regex CHECKs that pg-mem cannot run. Those fiat-acquiring contexts
+  // are verified against real Postgres and via their own pg-mem-shaped tables in
+  // viva-ledger-pg.spec.ts / viva-order-repo-pg.spec.ts, so they are excluded
+  // from this crypto-side harness.
+  return migrate(db, {
+    dir: MIGRATIONS_DIR,
+    excludeFiles: ['010_viva_fiat_acquiring.sql', '011_viva_checkout_orders.sql'],
+  });
 }

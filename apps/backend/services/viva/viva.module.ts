@@ -16,6 +16,7 @@ import {
   VIVA_CONFIG, VIVA_HTTP, VIVA_TOKEN_PROVIDER, ACQUIRING_GATEWAY, VIVA_DB,
   LEDGER_REPOSITORY, PROCESS_MOTO_PAYMENT, QUERY_TERMINAL_HISTORY,
   TOKENIZATION_GATEWAY, TOKENIZE_USECASE, CHECKOUT_ORDER_GATEWAY, CREATE_CHECKOUT_ORDER,
+  ORDER_REPOSITORY, VIVA_TX_VERIFIER, CONFIRM_CHECKOUT_PAYMENT, GET_ORDER_STATUS,
 } from './tokens';
 import { vivaConfigFromEnv, VivaEnvConfig } from './viva.config';
 import { FetchHttpClient } from './viva-http';
@@ -31,15 +32,25 @@ import { TokenizationGateway } from './tokenization';
 import { VivaOrderGateway } from './viva-order.gateway';
 import { CreateCheckoutOrderService } from './create-checkout-order.service';
 import { CheckoutOrderGateway } from './checkout';
+import { PgOrderRepository } from './pg-order.repository';
+import { OrderRepository } from './checkout-order.store';
+import { VivaTransactionVerifier, HttpGetClient } from './viva-verify';
+import { ConfirmCheckoutPaymentService } from './confirm-checkout-payment.service';
+import { GetOrderStatusService } from './get-order-status.service';
 import { AcquiringGateway, LedgerRepository } from './ports';
 import { PaymentController } from './payment.controller';
 import { TokenizeController } from './tokenize.controller';
 import { CheckoutController } from './checkout.controller';
+import { OrderStatusController } from './order-status.controller';
+import { VivaWebhookController } from './webhook.controller';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [SecurityModule],   // brings DeviceAuthGuard into scope for the controllers
-  controllers: [PaymentController, TokenizeController, CheckoutController, HealthController],
+  controllers: [
+    PaymentController, TokenizeController, CheckoutController,
+    OrderStatusController, VivaWebhookController, HealthController,
+  ],
   providers: [
     { provide: VIVA_CONFIG, useFactory: () => vivaConfigFromEnv() },
 
@@ -129,10 +140,46 @@ import { HealthController } from './health.controller';
       inject: [VIVA_HTTP, VIVA_TOKEN_PROVIDER, VIVA_CONFIG],
     },
 
+    // Persistence of the hosted-checkout order lifecycle (checkout_order, 011).
+    {
+      provide: ORDER_REPOSITORY,
+      useFactory: (db: Queryable) => new PgOrderRepository(db),
+      inject: [VIVA_DB],
+    },
+
     {
       provide: CREATE_CHECKOUT_ORDER,
-      useFactory: (gw: CheckoutOrderGateway) => new CreateCheckoutOrderService(gw),
-      inject: [CHECKOUT_ORDER_GATEWAY],
+      useFactory: (gw: CheckoutOrderGateway, orders: OrderRepository, cfg: VivaEnvConfig) =>
+        new CreateCheckoutOrderService(gw, orders, cfg.checkoutUrl),
+      inject: [CHECKOUT_ORDER_GATEWAY, ORDER_REPOSITORY, VIVA_CONFIG],
+    },
+
+    // Read-side verifier: re-fetches the transaction from Viva to confirm webhooks.
+    {
+      provide: VIVA_TX_VERIFIER,
+      useFactory: (http: HttpGetClient, tokens: VivaTokenProvider, cfg: VivaEnvConfig) => {
+        const auth = cfg.authScheme === 'basic'
+          ? new BasicAuthProvider(cfg.basic.merchantId, cfg.basic.apiKey)
+          : new BearerAuthProvider(tokens);
+        return new VivaTransactionVerifier(http, auth, {
+          wwwBaseUrl: cfg.wwwBaseUrl,
+          staticWebhookToken: cfg.webhookToken || undefined,
+        });
+      },
+      inject: [VIVA_HTTP, VIVA_TOKEN_PROVIDER, VIVA_CONFIG],
+    },
+
+    {
+      provide: CONFIRM_CHECKOUT_PAYMENT,
+      useFactory: (orders: OrderRepository, verifier: VivaTransactionVerifier) =>
+        new ConfirmCheckoutPaymentService(orders, verifier),
+      inject: [ORDER_REPOSITORY, VIVA_TX_VERIFIER],
+    },
+
+    {
+      provide: GET_ORDER_STATUS,
+      useFactory: (orders: OrderRepository) => new GetOrderStatusService(orders),
+      inject: [ORDER_REPOSITORY],
     },
   ],
 })
