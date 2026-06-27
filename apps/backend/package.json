@@ -9,9 +9,11 @@
   "dependencies": {
     "@nestjs/common": "^10.3.0",
     "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
     "@noble/hashes": "^1.8.0",
     "@scure/base": "^1.2.6",
     "@titan/profile-schema": "*",
+    "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "kafkajs": "^2.2.0",
     "pg": "^8.11.0",
