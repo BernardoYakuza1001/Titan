@@ -15,7 +15,7 @@ services:
     name: titan-acquiring
     runtime: node
     plan: free
-    region: frankfurt
+    region: oregon
     # Build replicates the verified local build; start migrates (idempotent) then serves.
     buildCommand: npm install && npm run build
     startCommand: node apps/backend/scripts/migrate.mjs && node apps/backend/dist/services/bootstrap/main.js
