@@ -43,13 +43,14 @@ import { TokenizeController } from './tokenize.controller';
 import { CheckoutController } from './checkout.controller';
 import { OrderStatusController } from './order-status.controller';
 import { VivaWebhookController } from './webhook.controller';
+import { NativeCheckoutController } from './native-checkout.controller';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [SecurityModule],   // brings DeviceAuthGuard into scope for the controllers
   controllers: [
     PaymentController, TokenizeController, CheckoutController,
-    OrderStatusController, VivaWebhookController, HealthController,
+    OrderStatusController, VivaWebhookController, NativeCheckoutController, HealthController,
   ],
   providers: [
     { provide: VIVA_CONFIG, useFactory: () => vivaConfigFromEnv() },
@@ -73,7 +74,8 @@ import { HealthController } from './health.controller';
           baseUrl: cfg.gateway.baseUrl,
           transactionsPath: useBasic ? cfg.nativeCheckoutPath : cfg.gateway.transactionsPath,
           sourceCode: cfg.gateway.sourceCode,
-          sendCurrencyCode: !useBasic,   // Native Checkout derives currency from the source
+          motoSourceCode: cfg.motoSourceCode,   // MOTO charge -> MOTO source (no 3DS)
+          sendCurrencyCode: !useBasic,          // Native Checkout derives currency from the source
         });
       },
       inject: [VIVA_HTTP, VIVA_TOKEN_PROVIDER, VIVA_CONFIG],

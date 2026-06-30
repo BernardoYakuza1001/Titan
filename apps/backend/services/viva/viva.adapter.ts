@@ -28,7 +28,8 @@ export interface VivaTokenProvider {
 export interface VivaConfig {
   baseUrl: string;          // e.g. https://api.vivapayments.com
   transactionsPath: string; // OAuth: /checkout/v2/transactions | Basic: /nativecheckout/v2/transactions
-  sourceCode: string;       // Viva payment source code
+  sourceCode: string;       // Viva payment source code (e-commerce; 3DS applies)
+  motoSourceCode?: string;  // MOTO source (out of 3DS scope) used when intent.moto
   /**
    * Send `currencyCode` in the body. OAuth /checkout expects it; Native Checkout
    * derives the currency from the source, so send `false` there to avoid a 400.
@@ -62,10 +63,13 @@ export class VivaWalletAcquiringAdapter implements AcquiringGateway {
       return { approved: false, error: { code: 'CONFIGURATION_ERROR', message: 'could not obtain Viva authorization', retriable: true } };
     }
 
+    // MOTO charges go to the MOTO source (out of 3DS scope) when one is configured.
+    const sourceCode = intent.moto && this.cfg.motoSourceCode ? this.cfg.motoSourceCode : this.cfg.sourceCode;
+
     const body: Record<string, unknown> = {
       amount: intent.amountMinor,        // Viva expects integer minor units
       chargeToken: intent.paymentToken,  // single-use token from the POS tokenizer (MOTO)
-      sourceCode: this.cfg.sourceCode,
+      sourceCode,
       merchantTrns: intent.correlationToken,           // our reference / idempotency
       customerTrns: `Terminal ${intent.terminalId}`,
     };

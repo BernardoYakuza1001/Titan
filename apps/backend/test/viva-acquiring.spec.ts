@@ -83,6 +83,22 @@ describe('VivaWalletAcquiringAdapter', () => {
     expect(calls[0].headers['Idempotency-Key']).toBe('corr-0001');
     expect(JSON.stringify(calls[0])).not.toContain('411111111111'); // no full PAN anywhere
   });
+  it('charges the MOTO source when intent.moto and a MOTO source is configured', async () => {
+    const { http, calls } = fakeHttp({ status: 200, body: { StatusId: 'F' } });
+    await new VivaWalletAcquiringAdapter(http, auth, { ...cfg, motoSourceCode: '2024' }).charge(intent({ moto: true }));
+    expect(calls[0].body.sourceCode).toBe('2024');
+  });
+  it('falls back to the e-commerce source for MOTO when none configured', async () => {
+    const { http, calls } = fakeHttp({ status: 200, body: { StatusId: 'F' } });
+    await new VivaWalletAcquiringAdapter(http, auth, cfg).charge(intent({ moto: true }));
+    expect(calls[0].body.sourceCode).toBe('Default');
+  });
+  it('uses the e-commerce source by default (no moto)', async () => {
+    const { http, calls } = fakeHttp({ status: 200, body: { StatusId: 'F' } });
+    await new VivaWalletAcquiringAdapter(http, auth, { ...cfg, motoSourceCode: '2024' }).charge(intent());
+    expect(calls[0].body.sourceCode).toBe('Default');
+  });
+
   it('maps a decline body to a domain error', async () => {
     const { http } = fakeHttp({ status: 200, body: { StatusId: 'E', ErrorText: 'Do not honor', ErrorCode: '05' } });
     expect((await new VivaWalletAcquiringAdapter(http, auth, cfg).charge(intent())).error?.code).toBe('DO_NOT_HONOR');

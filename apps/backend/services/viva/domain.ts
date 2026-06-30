@@ -22,6 +22,9 @@ export interface PaymentIntent {
   paymentToken: string;       // single-use Viva chargeToken from the POS tokenizer
   maskedPan: string;          // "411111****1111"
   cardBrand: CardBrand;
+  /** MOTO (manual/telephone) charge -> charge the MOTO source (out of 3DS scope)
+   *  when one is configured; otherwise the e-commerce source. */
+  moto?: boolean;
 }
 
 /** Provider-agnostic acquiring error taxonomy. */

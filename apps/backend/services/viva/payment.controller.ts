@@ -13,7 +13,7 @@
 import {
   BadRequestException, Body, Controller, ForbiddenException, Get, Headers, Inject, Post, Query, UseGuards,
 } from '@nestjs/common';
-import { IsIn, IsInt, IsPositive, IsString, Length, Matches } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsPositive, IsString, Length, Matches } from 'class-validator';
 import { ProcessMotoPaymentUseCase, QueryTerminalHistoryUseCase } from './ports';
 import { CardBrand, PaymentIntent, TransactionRecord } from './domain';
 import { PROCESS_MOTO_PAYMENT, QUERY_TERMINAL_HISTORY } from './tokens';
@@ -29,6 +29,7 @@ export class CreatePaymentDto {
   @IsString() paymentToken!: string;                 // single-use Viva chargeToken
   @Matches(/^[0-9]{0,6}\*{2,}[0-9]{4}$/) maskedPan!: string;  // masked only — rejects a full PAN
   @IsIn(CARD_BRANDS) cardBrand!: CardBrand;
+  @IsOptional() @IsBoolean() moto?: boolean;                 // charge the MOTO source (no 3DS)
 }
 
 @Controller('api/v1')
@@ -54,6 +55,7 @@ export class PaymentController {
       paymentToken: dto.paymentToken,
       maskedPan: dto.maskedPan,
       cardBrand: dto.cardBrand,
+      moto: dto.moto,
     };
     return this.processPayment.process(intent);
   }
