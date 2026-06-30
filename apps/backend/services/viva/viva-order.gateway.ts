@@ -45,6 +45,9 @@ export class VivaOrderGateway implements CheckoutOrderGateway {
           SourceCode: sourceCode,
           MerchantTrns: req.correlationToken,
           CustomerTrns: req.customerTrns ?? `Terminal ${req.terminalId}`,
+          // Establish a recurring mandate on this authenticated payment, so later
+          // merchant-initiated charges off this transaction skip 3DS.
+          ...(req.recurring ? { AllowRecurring: true } : {}),
         },
         {
           Authorization: authorization,       // "Basic …"

@@ -17,6 +17,7 @@ import {
   LEDGER_REPOSITORY, PROCESS_MOTO_PAYMENT, QUERY_TERMINAL_HISTORY,
   TOKENIZATION_GATEWAY, TOKENIZE_USECASE, CHECKOUT_ORDER_GATEWAY, CREATE_CHECKOUT_ORDER,
   ORDER_REPOSITORY, VIVA_TX_VERIFIER, CONFIRM_CHECKOUT_PAYMENT, GET_ORDER_STATUS,
+  RECURRING_REPOSITORY, RECURRING_GATEWAY, PROCESS_RECURRING_CHARGE,
 } from './tokens';
 import { vivaConfigFromEnv, VivaEnvConfig } from './viva.config';
 import { FetchHttpClient } from './viva-http';
@@ -37,6 +38,10 @@ import { OrderRepository } from './checkout-order.store';
 import { VivaTransactionVerifier, HttpGetClient } from './viva-verify';
 import { ConfirmCheckoutPaymentService } from './confirm-checkout-payment.service';
 import { GetOrderStatusService } from './get-order-status.service';
+import { PgRecurringRepository } from './pg-recurring.repository';
+import { RecurringRepository } from './recurring.store';
+import { VivaRecurringGateway } from './viva-recurring.gateway';
+import { ProcessRecurringChargeService } from './process-recurring-charge.service';
 import { AcquiringGateway, LedgerRepository } from './ports';
 import { PaymentController } from './payment.controller';
 import { TokenizeController } from './tokenize.controller';
@@ -44,13 +49,15 @@ import { CheckoutController } from './checkout.controller';
 import { OrderStatusController } from './order-status.controller';
 import { VivaWebhookController } from './webhook.controller';
 import { NativeCheckoutController } from './native-checkout.controller';
+import { RecurringController } from './recurring.controller';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [SecurityModule],   // brings DeviceAuthGuard into scope for the controllers
   controllers: [
     PaymentController, TokenizeController, CheckoutController,
-    OrderStatusController, VivaWebhookController, NativeCheckoutController, HealthController,
+    OrderStatusController, VivaWebhookController, NativeCheckoutController,
+    RecurringController, HealthController,
   ],
   providers: [
     { provide: VIVA_CONFIG, useFactory: () => vivaConfigFromEnv() },
@@ -184,6 +191,34 @@ import { HealthController } from './health.controller';
       useFactory: (orders: OrderRepository, verifier: VivaTransactionVerifier) =>
         new GetOrderStatusService(orders, verifier),
       inject: [ORDER_REPOSITORY, VIVA_TX_VERIFIER],
+    },
+
+    // ---- Recurring / merchant-initiated (no-OTP) charges ----
+    {
+      provide: RECURRING_REPOSITORY,
+      useFactory: (db: Queryable) => new PgRecurringRepository(db),
+      inject: [VIVA_DB],
+    },
+    {
+      provide: RECURRING_GATEWAY,
+      useFactory: (http: HttpClient, tokens: VivaTokenProvider, cfg: VivaEnvConfig) => {
+        // Recurring charges chain off the initial transaction id over the same
+        // auth scheme as the rest of the account (Basic by default).
+        const auth = cfg.authScheme === 'basic'
+          ? new BasicAuthProvider(cfg.basic.merchantId, cfg.basic.apiKey)
+          : new BearerAuthProvider(tokens);
+        return new VivaRecurringGateway(http, auth, {
+          wwwBaseUrl: cfg.wwwBaseUrl,
+          sourceCode: cfg.gateway.sourceCode,
+        });
+      },
+      inject: [VIVA_HTTP, VIVA_TOKEN_PROVIDER, VIVA_CONFIG],
+    },
+    {
+      provide: PROCESS_RECURRING_CHARGE,
+      useFactory: (gw: VivaRecurringGateway, repo: RecurringRepository) =>
+        new ProcessRecurringChargeService(gw, repo),
+      inject: [RECURRING_GATEWAY, RECURRING_REPOSITORY],
     },
   ],
 })

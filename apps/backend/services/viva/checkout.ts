@@ -18,6 +18,9 @@ export interface CheckoutOrderRequest {
   /** Request a MOTO (manual/telephone) order — uses the MOTO payment source (no
    *  3DS/OTP) when one is configured; otherwise falls back to the e-commerce source. */
   moto?: boolean;
+  /** Set AllowRecurring on the order so this (authenticated) payment establishes a
+   *  mandate for later merchant-initiated, no-OTP charges (see recurring controller). */
+  recurring?: boolean;
 }
 
 export interface CreateOrderOutcome {

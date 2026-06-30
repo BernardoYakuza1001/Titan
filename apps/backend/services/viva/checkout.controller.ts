@@ -23,6 +23,7 @@ export class CreateOrderDto {
   @IsString() @Length(3, 3) currency!: string;
   @IsOptional() @IsString() customerTrns?: string;
   @IsOptional() @IsBoolean() moto?: boolean;
+  @IsOptional() @IsBoolean() recurring?: boolean;
 }
 
 function httpStatusFor(code: AcquiringErrorCode | undefined): number {
@@ -58,6 +59,7 @@ export class CheckoutController {
       merchantId: dto.merchantId,
       customerTrns: dto.customerTrns,
       moto: dto.moto,
+      recurring: dto.recurring,
     });
 
     if (!outcome.ok || !outcome.checkoutUrl) {

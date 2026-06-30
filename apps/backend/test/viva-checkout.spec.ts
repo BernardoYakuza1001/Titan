@@ -55,6 +55,18 @@ describe('VivaOrderGateway', () => {
     expect(calls[0].b.SourceCode).toBe('1937');
   });
 
+  it('sets AllowRecurring on the order when recurring is requested (establishes the MIT mandate)', async () => {
+    const { h, calls } = http({ status: 200, body: { OrderCode: 1 } });
+    await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), cfg).createOrder({ ...req, recurring: true });
+    expect(calls[0].b.AllowRecurring).toBe(true);
+  });
+
+  it('omits AllowRecurring by default', async () => {
+    const { h, calls } = http({ status: 200, body: { OrderCode: 1 } });
+    await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), cfg).createOrder(req);
+    expect(calls[0].b.AllowRecurring).toBeUndefined();
+  });
+
   it('401 -> CONFIGURATION_ERROR', async () => {
     const { h } = http({ status: 401, body: {} });
     expect((await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), cfg).createOrder(req)).error?.code).toBe('CONFIGURATION_ERROR');

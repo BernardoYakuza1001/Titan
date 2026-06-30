@@ -41,8 +41,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class VivaCheckoutActivity extends Activity {
 
-    private EditText backendUrl, deviceToken, amount, currency;
-    private CheckBox motoCheck;
+    private EditText backendUrl, deviceToken, amount, currency, initialTxnId;
+    private CheckBox motoCheck, recurringCheck;
     private TextView status;
     private Button payButton;
 
@@ -114,8 +114,14 @@ public class VivaCheckoutActivity extends Activity {
         motoCheck = new CheckBox(this);
         motoCheck.setText("MOTO — manual / telephone order (no OTP)");
         motoCheck.setTextColor(0xFFE6F4EF);
-        motoCheck.setPadding(0, 12, 0, 12);
+        motoCheck.setPadding(0, 12, 0, 8);
         root.addView(motoCheck);
+
+        recurringCheck = new CheckBox(this);
+        recurringCheck.setText("Enable recurring mandate (lets you charge again later with NO OTP)");
+        recurringCheck.setTextColor(0xFFE6F4EF);
+        recurringCheck.setPadding(0, 0, 0, 12);
+        root.addView(recurringCheck);
 
         Button testButton = new Button(this);
         testButton.setText("Test connection");
@@ -126,6 +132,21 @@ public class VivaCheckoutActivity extends Activity {
         payButton.setText("Create order & pay");
         payButton.setOnClickListener(v -> createOrderAndPay());
         root.addView(payButton);
+
+        // ---- Repeat charge (merchant-initiated, NO OTP) ----
+        TextView repeatHint = new TextView(this);
+        repeatHint.setText("— or charge a returning customer (no OTP) —");
+        repeatHint.setTextColor(0xFF7FA89B);
+        repeatHint.setPadding(0, 24, 0, 4);
+        root.addView(repeatHint);
+
+        initialTxnId = field("Initial txn ID (from a prior recurring-mandate payment)", "", InputType.TYPE_CLASS_TEXT);
+        root.addView(initialTxnId);
+
+        Button repeatButton = new Button(this);
+        repeatButton.setText("Repeat charge (no OTP)");
+        repeatButton.setOnClickListener(v -> repeatCharge());
+        root.addView(repeatButton);
 
         status = new TextView(this);
         status.setTextColor(0xFFE6F4EF);
@@ -161,6 +182,7 @@ public class VivaCheckoutActivity extends Activity {
         }
         final long amountMinor = amt;
         final boolean moto = motoCheck.isChecked();
+        final boolean recurring = recurringCheck.isChecked();
         final String correlation = "pos-" + UUID.randomUUID();
 
         if (base.startsWith("http://") && !base.contains("localhost") && !base.contains("127.0.0.1")) {
@@ -178,6 +200,7 @@ public class VivaCheckoutActivity extends Activity {
                 body.put("amountMinor", amountMinor);
                 body.put("currency", cur);
                 body.put("moto", moto);
+                body.put("recurring", recurring);
 
                 HttpURLConnection c = (HttpURLConnection) new URL(base + "/api/v1/checkout/orders").openConnection();
                 c.setRequestMethod("POST");
@@ -258,14 +281,26 @@ public class VivaCheckoutActivity extends Activity {
         }
     }
 
-    /** Render the result EXACTLY once if the status is terminal. Returns true once settled. */
-    private boolean renderIfTerminal(String st, final String orderCode) {
+    /** Render the result EXACTLY once if the status is terminal. Returns true once settled.
+     *  Takes the full status JSON body so it can surface the Viva transaction id (the
+     *  anchor a returning customer is charged against with no OTP). */
+    private boolean renderIfTerminal(String body, final String orderCode) {
+        if (body == null) return settled.get();
+        String st = "", txn = "";
+        try {
+            JSONObject j = new JSONObject(body);
+            st = j.optString("status", "");
+            txn = j.optString("vivaTransactionId", "");
+        } catch (Exception e) {
+            return settled.get();
+        }
+        final String fTxn = txn;
         if ("PAID".equals(st) && settled.compareAndSet(false, true)) {
-            runOnUiThread(() -> showResult(true, orderCode));
+            runOnUiThread(() -> showResult(true, orderCode, fTxn));
             return true;
         }
         if ("FAILED".equals(st) && settled.compareAndSet(false, true)) {
-            runOnUiThread(() -> showResult(false, orderCode));
+            runOnUiThread(() -> showResult(false, orderCode, ""));
             return true;
         }
         return settled.get();
@@ -277,7 +312,7 @@ public class VivaCheckoutActivity extends Activity {
             int attempts = 0;
             while (!destroyed && !settled.get() && attempts < POLL_MAX_ATTEMPTS) {
                 attempts++;
-                if (renderIfTerminal(safeStatus(base, token, orderCode), orderCode)) return;
+                if (renderIfTerminal(safeStatusBody(base, token, orderCode), orderCode)) return;
                 try { Thread.sleep(POLL_INTERVAL_MS); } catch (InterruptedException e) { return; }
             }
             // Gave up auto-polling (e.g. webhook slower than the window) — DON'T show
@@ -292,15 +327,17 @@ public class VivaCheckoutActivity extends Activity {
     private void checkStatusOnce(final String base, final String token, final String orderCode, final TextView poll) {
         runOnUiThread(() -> poll.setText("  Checking…"));
         new Thread(() -> {
-            String st = safeStatus(base, token, orderCode);
-            if (renderIfTerminal(st, orderCode)) return;
-            final String shown = st == null || st.isEmpty() ? "PENDING" : st;
-            runOnUiThread(() -> poll.setText("  Status: " + shown + " — waiting…"));
+            String body = safeStatusBody(base, token, orderCode);
+            if (renderIfTerminal(body, orderCode)) return;
+            String shown = "PENDING";
+            try { if (body != null) shown = new JSONObject(body).optString("status", "PENDING"); } catch (Exception ignored) { }
+            final String f = shown;
+            runOnUiThread(() -> poll.setText("  Status: " + f + " — waiting…"));
         }).start();
     }
 
-    /** GET the order status; returns the status string or null on any error. */
-    private String safeStatus(String base, String token, String orderCode) {
+    /** GET the order status; returns the raw JSON body (status + vivaTransactionId) or null. */
+    private String safeStatusBody(String base, String token, String orderCode) {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(base + "/api/v1/checkout/orders/" + orderCode).openConnection();
             c.setRequestProperty("Authorization", "Bearer " + token);
@@ -308,15 +345,16 @@ public class VivaCheckoutActivity extends Activity {
             c.setReadTimeout(10000);
             int code = c.getResponseCode();
             String resp = readAll(code >= 400 ? c.getErrorStream() : c.getInputStream());
-            if (code == 200) return new JSONObject(resp).optString("status", "");
+            if (code == 200) return resp;
         } catch (Exception ignored) {
             // network blip / cold start — the loop will retry
         }
         return null;
     }
 
-    /** Final result screen. */
-    private void showResult(boolean success, String orderCode) {
+    /** Final result screen. On success, surfaces the Viva transaction id — save it as
+     *  the customer's anchor to charge them again later with NO OTP. */
+    private void showResult(boolean success, String orderCode, String vivaTxnId) {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
@@ -333,9 +371,19 @@ public class VivaCheckoutActivity extends Activity {
         TextView sub = new TextView(this);
         sub.setText("Order " + orderCode);
         sub.setTextColor(0xFF9FC4B6);
-        sub.setPadding(0, 16, 0, 32);
+        sub.setPadding(0, 16, 0, 16);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub);
+
+        if (success && vivaTxnId != null && !vivaTxnId.isEmpty()) {
+            TextView anchor = new TextView(this);
+            anchor.setText("Recurring anchor (save for no-OTP repeat charges):\n" + vivaTxnId);
+            anchor.setTextColor(0xFFBFE3D6);
+            anchor.setTextIsSelectable(true);
+            anchor.setPadding(0, 0, 0, 28);
+            anchor.setGravity(Gravity.CENTER);
+            root.addView(anchor);
+        }
 
         Button done = new Button(this);
         done.setText("Done");
@@ -343,6 +391,65 @@ public class VivaCheckoutActivity extends Activity {
         root.addView(done);
 
         setContentView(root);
+    }
+
+    /** Merchant-initiated repeat charge — NO OTP. Charges a returning customer by
+     *  chaining off the initial recurring-mandate transaction id. */
+    private void repeatCharge() {
+        final String base = backendUrl.getText().toString().trim().replaceAll("/+$", "");
+        final String token = deviceToken.getText().toString().trim();
+        final String cur = currency.getText().toString().trim().toUpperCase();
+        final String initTxn = initialTxnId.getText().toString().trim();
+        if (initTxn.isEmpty()) {
+            Toast.makeText(this, "Enter the initial transaction ID (from a prior recurring-mandate payment)", Toast.LENGTH_LONG).show();
+            return;
+        }
+        long amt;
+        try {
+            amt = Long.parseLong(amount.getText().toString().trim());
+        } catch (Exception e) {
+            Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final long amountMinor = amt;
+        final String correlation = "rec-" + UUID.randomUUID();
+        setStatus("Charging returning customer (no OTP)…");
+        new Thread(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("correlationToken", correlation);
+                body.put("merchantId", "MERCH-1");
+                body.put("initialTransactionId", initTxn);
+                body.put("amountMinor", amountMinor);
+                body.put("currency", cur);
+
+                HttpURLConnection c = (HttpURLConnection) new URL(base + "/api/v1/recurring/charge").openConnection();
+                c.setRequestMethod("POST");
+                c.setRequestProperty("Authorization", "Bearer " + token);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(40000);
+                c.setDoOutput(true);
+                try (OutputStream os = c.getOutputStream()) {
+                    os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
+                int code = c.getResponseCode();
+                String resp = readAll(code >= 400 ? c.getErrorStream() : c.getInputStream());
+                if (code >= 200 && code < 300) {
+                    JSONObject j = new JSONObject(resp);
+                    String st = j.optString("status", "");
+                    if ("RECURRING_APPROVED".equals(st)) {
+                        setStatus("✓ Charged (no OTP) — txn " + j.optString("vivaTransactionId", ""));
+                    } else {
+                        setStatus("Declined: " + resp);
+                    }
+                } else {
+                    setStatus("Charge failed (" + code + "): " + resp);
+                }
+            } catch (Exception e) {
+                setStatus("Error: " + e.getMessage());
+            }
+        }).start();
     }
 
     /** Quick reachability check — GET /api/v1/health with a short timeout. */

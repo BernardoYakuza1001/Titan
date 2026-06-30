@@ -131,6 +131,8 @@ export async function applyMigrations(db: Db): Promise<number> {
   // from this crypto-side harness.
   return migrate(db, {
     dir: MIGRATIONS_DIR,
-    excludeFiles: ['010_viva_fiat_acquiring.sql', '011_viva_checkout_orders.sql'],
+    excludeFiles: [
+      '010_viva_fiat_acquiring.sql', '011_viva_checkout_orders.sql', '012_recurring_charge.sql',
+    ],
   });
 }
