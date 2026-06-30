@@ -39,6 +39,12 @@ services:
         value: https://www.vivapayments.com
       - key: VIVA_SOURCE_CODE
         value: "1937"
+      # Optional: MOTO (manual/telephone) payment source code. Set this to the
+      # 4-digit code of a MOTO source AFTER Viva enables MOTO on the account; then
+      # requests with "moto": true create the order against it (no 3DS/OTP). Until
+      # set, MOTO requests fall back to the e-commerce source above (3DS still applies).
+      - key: VIVA_MOTO_SOURCE_CODE
+        sync: false
       # ---- secrets: set these in the Render dashboard (sync:false = never in the repo) ----
       # Set DEVICE_JWT_SECRET to the value in apps/backend/.env so the app's
       # pre-filled device token keeps working (or set a new one + re-mint a token).

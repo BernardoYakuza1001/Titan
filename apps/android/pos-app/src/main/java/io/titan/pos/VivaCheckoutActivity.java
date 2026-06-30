@@ -11,6 +11,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -41,6 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class VivaCheckoutActivity extends Activity {
 
     private EditText backendUrl, deviceToken, amount, currency;
+    private CheckBox motoCheck;
     private TextView status;
     private Button payButton;
 
@@ -109,6 +111,12 @@ public class VivaCheckoutActivity extends Activity {
         root.addView(amount);
         root.addView(currency);
 
+        motoCheck = new CheckBox(this);
+        motoCheck.setText("MOTO — manual / telephone order (no OTP)");
+        motoCheck.setTextColor(0xFFE6F4EF);
+        motoCheck.setPadding(0, 12, 0, 12);
+        root.addView(motoCheck);
+
         Button testButton = new Button(this);
         testButton.setText("Test connection");
         testButton.setOnClickListener(v -> testConnection());
@@ -152,6 +160,7 @@ public class VivaCheckoutActivity extends Activity {
             return;
         }
         final long amountMinor = amt;
+        final boolean moto = motoCheck.isChecked();
         final String correlation = "pos-" + UUID.randomUUID();
 
         if (base.startsWith("http://") && !base.contains("localhost") && !base.contains("127.0.0.1")) {
@@ -168,6 +177,7 @@ public class VivaCheckoutActivity extends Activity {
                 body.put("merchantId", "MERCH-1");
                 body.put("amountMinor", amountMinor);
                 body.put("currency", cur);
+                body.put("moto", moto);
 
                 HttpURLConnection c = (HttpURLConnection) new URL(base + "/api/v1/checkout/orders").openConnection();
                 c.setRequestMethod("POST");

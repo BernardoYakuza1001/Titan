@@ -10,7 +10,7 @@
 import {
   Body, Controller, ForbiddenException, Headers, HttpException, HttpStatus, Inject, Post, UseGuards,
 } from '@nestjs/common';
-import { IsInt, IsOptional, IsPositive, IsString, Length } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsPositive, IsString, Length } from 'class-validator';
 import { CreateCheckoutOrderUseCase } from './checkout';
 import { AcquiringErrorCode } from './domain';
 import { CREATE_CHECKOUT_ORDER } from './tokens';
@@ -22,6 +22,7 @@ export class CreateOrderDto {
   @IsInt() @IsPositive() amountMinor!: number;
   @IsString() @Length(3, 3) currency!: string;
   @IsOptional() @IsString() customerTrns?: string;
+  @IsOptional() @IsBoolean() moto?: boolean;
 }
 
 function httpStatusFor(code: AcquiringErrorCode | undefined): number {
@@ -56,6 +57,7 @@ export class CheckoutController {
       terminalId,
       merchantId: dto.merchantId,
       customerTrns: dto.customerTrns,
+      moto: dto.moto,
     });
 
     if (!outcome.ok || !outcome.checkoutUrl) {

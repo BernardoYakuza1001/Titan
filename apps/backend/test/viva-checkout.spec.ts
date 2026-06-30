@@ -36,6 +36,25 @@ describe('VivaOrderGateway', () => {
     expect(calls[0].b.SourceCode).toBe('1937');
     expect(calls[0].b.MerchantTrns).toBe('corr-1');
   });
+  it('uses the MOTO source when req.moto and a MOTO source is configured (no 3DS path)', async () => {
+    const { h, calls } = http({ status: 200, body: { OrderCode: 1 } });
+    await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), { ...cfg, motoSourceCode: '2024' })
+      .createOrder({ ...req, moto: true });
+    expect(calls[0].b.SourceCode).toBe('2024');
+  });
+
+  it('falls back to the e-commerce source when MOTO is requested but none configured', async () => {
+    const { h, calls } = http({ status: 200, body: { OrderCode: 1 } });
+    await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), cfg).createOrder({ ...req, moto: true });
+    expect(calls[0].b.SourceCode).toBe('1937');
+  });
+
+  it('uses the e-commerce source by default (no moto flag)', async () => {
+    const { h, calls } = http({ status: 200, body: { OrderCode: 1 } });
+    await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), { ...cfg, motoSourceCode: '2024' }).createOrder(req);
+    expect(calls[0].b.SourceCode).toBe('1937');
+  });
+
   it('401 -> CONFIGURATION_ERROR', async () => {
     const { h } = http({ status: 401, body: {} });
     expect((await new VivaOrderGateway(h, new BasicAuthProvider('M', 'K'), cfg).createOrder(req)).error?.code).toBe('CONFIGURATION_ERROR');

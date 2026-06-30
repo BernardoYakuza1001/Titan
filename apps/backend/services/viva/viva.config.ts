@@ -14,6 +14,10 @@ export interface VivaEnvConfig {
   tokenizePath: string;
   ordersUrl: string;
   checkoutUrl: string;
+  /** Optional MOTO payment source code. When set and a request asks for MOTO, the
+   *  order is created against this source (MOTO is out of scope for 3DS/OTP). Empty
+   *  = no MOTO source configured yet, so MOTO requests fall back to the e-com source. */
+  motoSourceCode: string;
   databaseUrl: string;
   /** www base for the read-side confirmation API (transactions + webhook token). */
   wwwBaseUrl: string;
@@ -43,6 +47,7 @@ export function vivaConfigFromEnv(env: NodeJS.ProcessEnv = process.env): VivaEnv
     tokenizePath: env.VIVA_TOKENIZE_PATH ?? '/acquiring/v1/cards/tokens',
     ordersUrl: env.VIVA_ORDERS_URL ?? 'https://www.vivapayments.com/api/orders',
     checkoutUrl: env.VIVA_CHECKOUT_URL ?? 'https://www.vivapayments.com/web/checkout',
+    motoSourceCode: env.VIVA_MOTO_SOURCE_CODE ?? '',
     databaseUrl: env.DATABASE_URL ?? '',
     wwwBaseUrl: env.VIVA_WWW_BASE_URL ?? 'https://www.vivapayments.com',
     webhookSecret: env.VIVA_WEBHOOK_SECRET ?? '',

@@ -135,6 +135,7 @@ import { HealthController } from './health.controller';
           ordersUrl: cfg.ordersUrl,
           checkoutUrl: cfg.checkoutUrl,
           sourceCode: cfg.gateway.sourceCode,
+          motoSourceCode: cfg.motoSourceCode,
         });
       },
       inject: [VIVA_HTTP, VIVA_TOKEN_PROVIDER, VIVA_CONFIG],
