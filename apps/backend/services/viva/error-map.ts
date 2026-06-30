@@ -20,6 +20,9 @@ const APPROVED_STATUS = new Set(['F', 'A']);
 
 /** Decline classification by ErrorText/EventText substring (order = priority). */
 const DECLINE_TEXT_RULES: Array<{ match: RegExp; code: AcquiringErrorCode; retriable: boolean }> = [
+  // Recurring/MIT setup gotcha (Viva #232): the anchor transaction wasn't recurring-
+  // eligible. Surface clearly (setup issue, NOT a card decline) so it's actionable.
+  { match: /does not allow recurring|allows?recurring|recurring charge/i, code: 'CONFIGURATION_ERROR', retriable: false },
   { match: /insufficient|not enough funds|51\b/i, code: 'INSUFFICIENT_FUNDS', retriable: false },
   { match: /expired|54\b/i,                       code: 'EXPIRED_CARD',       retriable: false },
   { match: /invalid card|invalid pan|card number|14\b/i, code: 'INVALID_CARD', retriable: false },

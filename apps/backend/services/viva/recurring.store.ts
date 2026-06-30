@@ -5,7 +5,11 @@
  * transaction. No card data — only Viva ids + money. Forward-only / idempotent.
  */
 
-export type RecurringStatus = 'RECURRING_CREATED' | 'RECURRING_APPROVED' | 'RECURRING_DECLINED';
+export type RecurringStatus =
+  | 'RECURRING_CREATED'
+  | 'RECURRING_PROCESSING'   // submitted but outcome unknown (transport failure) — reconcile, do NOT retry
+  | 'RECURRING_APPROVED'
+  | 'RECURRING_DECLINED';
 
 export interface RecurringChargeRecord {
   id: string;

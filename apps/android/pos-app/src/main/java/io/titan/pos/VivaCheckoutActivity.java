@@ -440,6 +440,9 @@ public class VivaCheckoutActivity extends Activity {
                     String st = j.optString("status", "");
                     if ("RECURRING_APPROVED".equals(st)) {
                         setStatus("✓ Charged (no OTP) — txn " + j.optString("vivaTransactionId", ""));
+                    } else if ("RECURRING_PROCESSING".equals(st)) {
+                        setStatus("⏳ PENDING — outcome unknown (network issue). DO NOT re-charge; "
+                                + "verify this transaction in your Viva dashboard first.");
                     } else {
                         setStatus("Declined: " + resp);
                     }

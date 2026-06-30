@@ -1,0 +1,12 @@
+-- ============================================================================
+-- PROJECT TITAN — add an in-flight PROCESSING state to recurring_status.
+--
+-- A lost-response (indeterminate) MIT charge must NOT be written as a terminal
+-- DECLINED — the card may already have been charged. It is parked as
+-- RECURRING_PROCESSING and reconciled out-of-band. Idempotent + forward-only.
+--
+-- NOTE: kept as its own migration (no transaction wrapper, single statement) so the
+-- new enum value is committed before 014 recreates the guard function that
+-- references it (CREATE FUNCTION validates the body against the enum).
+-- ============================================================================
+ALTER TYPE recurring_status ADD VALUE IF NOT EXISTS 'RECURRING_PROCESSING';

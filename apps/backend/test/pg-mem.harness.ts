@@ -133,6 +133,7 @@ export async function applyMigrations(db: Db): Promise<number> {
     dir: MIGRATIONS_DIR,
     excludeFiles: [
       '010_viva_fiat_acquiring.sql', '011_viva_checkout_orders.sql', '012_recurring_charge.sql',
+      '013_recurring_processing_enum.sql', '014_recurring_processing_guard.sql',
     ],
   });
 }

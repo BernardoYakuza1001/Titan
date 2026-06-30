@@ -22,7 +22,7 @@ function http(res: any, opts: { throws?: boolean } = {}) {
 const auth = new BasicAuthProvider('MID', 'KEY');
 const BASIC = 'Basic ' + Buffer.from('MID:KEY').toString('base64');
 const cfg = { wwwBaseUrl: 'https://www.vivapayments.com', sourceCode: '1937' };
-const req = { initialTransactionId: 'TX-INIT', amountMinor: 500, currency: 'EUR', correlationToken: 'corr-1', customerTrns: 'Sub' };
+const req = { initialTransactionId: 'TX-INIT', amountMinor: 500, correlationToken: 'corr-1', customerTrns: 'Sub' };
 
 describe('VivaRecurringGateway', () => {
   it('charges the initial transaction over Basic auth and maps success (no 3DS path)', async () => {
@@ -34,23 +34,24 @@ describe('VivaRecurringGateway', () => {
     expect(calls[0].hd.Authorization).toBe(BASIC);
     expect(calls[0].hd['Idempotency-Key']).toBe('corr-1');
     expect(calls[0].b.amount).toBe(500);
-    expect(calls[0].b.currencyCode).toBe(978);
     expect(calls[0].b.merchantTrns).toBe('corr-1');
     expect(calls[0].b.sourceCode).toBe('1937');
+    // currency is inherited from the anchor transaction — never sent on the recurring charge.
+    expect(calls[0].b.currencyCode).toBeUndefined();
   });
   it('maps a decline body to a domain error', async () => {
     const { h } = http({ status: 200, body: { StatusId: 'E', ErrorText: 'Do not honor', ErrorCode: '05' } });
     expect((await new VivaRecurringGateway(h, auth, cfg).charge(req)).error?.code).toBe('DO_NOT_HONOR');
   });
-  it('unsupported currency -> INVALID_AMOUNT, no HTTP call', async () => {
-    const { h, calls } = http({ status: 200, body: {} });
-    const out = await new VivaRecurringGateway(h, auth, cfg).charge({ ...req, currency: 'ZZZ' });
-    expect(out.error?.code).toBe('INVALID_AMOUNT');
-    expect(calls).toHaveLength(0);
+  it('"does not allow recurring charge" -> CONFIGURATION_ERROR (clear setup error, not a card decline)', async () => {
+    const { h } = http({ status: 200, body: { StatusId: 'E', ErrorText: 'The transaction does not allow recurring charge' } });
+    expect((await new VivaRecurringGateway(h, auth, cfg).charge(req)).error?.code).toBe('CONFIGURATION_ERROR');
   });
-  it('a thrown HTTP call -> GATEWAY_TIMEOUT', async () => {
+  it('a thrown HTTP call -> GATEWAY_TIMEOUT (retriable / indeterminate)', async () => {
     const { h } = http({}, { throws: true });
-    expect((await new VivaRecurringGateway(h, auth, cfg).charge(req)).error?.code).toBe('GATEWAY_TIMEOUT');
+    const out = await new VivaRecurringGateway(h, auth, cfg).charge(req);
+    expect(out.error?.code).toBe('GATEWAY_TIMEOUT');
+    expect(out.error?.retriable).toBe(true);
   });
 });
 
@@ -93,11 +94,17 @@ describe('ProcessRecurringChargeService', () => {
     expect(rec.status).toBe('RECURRING_APPROVED');
     expect(rec.vivaTransactionId).toBe('vt');
   });
-  it('DECLINED on failure with an error log (no throw)', async () => {
+  it('DECLINED on a DEFINITE (non-retriable) decline with an error log', async () => {
     const repo = new MemRecurringRepo();
     const rec = await new ProcessRecurringChargeService(gw({ approved: false, error: { code: 'DO_NOT_HONOR', message: 'x', retriable: false } }), repo).process(input);
     expect(rec.status).toBe('RECURRING_DECLINED');
     expect(rec.errorLog?.code).toBe('DO_NOT_HONOR');
+  });
+  it('PROCESSING (not DECLINED) on an INDETERMINATE timeout — prevents an operator double-charge', async () => {
+    const repo = new MemRecurringRepo();
+    const rec = await new ProcessRecurringChargeService(gw({ approved: false, error: { code: 'GATEWAY_TIMEOUT', message: 'no response', retriable: true } }), repo).process(input);
+    expect(rec.status).toBe('RECURRING_PROCESSING');
+    expect(rec.errorLog?.indeterminate).toBe(true);
   });
   it('idempotent: a retried correlation token returns the original and charges only once', async () => {
     const repo = new MemRecurringRepo();

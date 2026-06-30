@@ -53,7 +53,6 @@ export class ProcessRecurringChargeService {
       outcome = await this.gateway.charge({
         initialTransactionId: input.initialTransactionId,
         amountMinor: input.amountMinor,
-        currency: input.currency,
         correlationToken: input.correlationToken,
         customerTrns: input.customerTrns,
       });
@@ -67,6 +66,25 @@ export class ProcessRecurringChargeService {
         vivaTransactionId: outcome.vivaTransactionId ?? null,
       });
     }
+
+    // CRITICAL: distinguish a DEFINITE decline (known not-charged) from an
+    // INDETERMINATE transport failure (timeout / 5xx). On an indeterminate outcome
+    // the card MAY already have been charged at Viva, so writing a terminal DECLINED
+    // would let the operator re-ring and double-charge. Park such rows as PROCESSING
+    // (non-terminal) — they must be reconciled out-of-band (Viva dashboard) before any
+    // retry. Only a definite decline (StatusId 'E' / 4xx, retriable === false) is final.
+    const indeterminate = outcome.error?.retriable === true;
+    if (indeterminate) {
+      return this.repo.updateStatus(record.id, {
+        status: 'RECURRING_PROCESSING',
+        errorLog: {
+          code: outcome.error?.code ?? 'UNKNOWN',
+          message: outcome.error?.message ?? 'indeterminate outcome',
+          indeterminate: true,
+        },
+      });
+    }
+
     return this.repo.updateStatus(record.id, {
       status: 'RECURRING_DECLINED',
       vivaTransactionId: outcome.vivaTransactionId ?? null,
